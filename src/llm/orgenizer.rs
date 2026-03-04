@@ -241,18 +241,48 @@ pub async fn group_raw_text_to_episodes(input_dir: &str, book_name: &str) -> any
     log::info!("Found {} page files to process", page_files.len());
 
     let mut current_episode: Option<Episode> = None;
-    // Resume counter from highest completed index in the cache
-    let mut episode_counter: usize = status_cache
-        .values()
-        .filter(|e| e.status == EpisodeStatusKind::Completed)
-        .map(|e| e.index)
-        .max()
+
+    // Find the last completed episode (highest index) to resume from.
+    // Extract the values we need before status_cache is borrowed mutably later.
+    let (resume_episode_counter, resume_last_page) = {
+        let last_completed = status_cache
+            .values()
+            .filter(|e| e.status == EpisodeStatusKind::Completed)
+            .max_by_key(|e| e.index);
+        (
+            last_completed.map_or(0, |e| e.index),
+            last_completed.and_then(|e| e.pages.last()).cloned(),
+        )
+    };
+
+    let mut episode_counter: usize = resume_episode_counter;
+
+    // Determine which page index to start processing from.
+    // Start from the page AFTER the last page of the last completed episode.
+    let start_from_idx: usize = resume_last_page
+        .and_then(|last_page| {
+            page_files.iter().position(|p| {
+                p.file_name().and_then(|n| n.to_str()) == Some(last_page.as_str())
+            })
+        })
+        .map(|pos| {
+            log::info!(
+                "Resuming: skipping {} pages, starting after last completed episode",
+                pos + 1
+            );
+            pos + 1
+        })
         .unwrap_or(0);
+
     // true when current_episode is one that was already completed — skip writing it again
     let mut current_episode_already_completed = false;
     let mut current_episode_pages: Vec<String> = Vec::new();
 
     for (idx, page_path) in page_files.iter().enumerate() {
+        if idx < start_from_idx {
+            continue;
+        }
+
         log::debug!(
             "Processing page {}/{}: {:?}",
             idx + 1,

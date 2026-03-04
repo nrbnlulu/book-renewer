@@ -38,6 +38,7 @@ a list of JSON entries, each representing a new episode or appending to the last
 - note that you MUST not change the text at all (unless u see text that is not in the core context of the book, like page numbers, headers, copy rights etc..), just group it based on episodes context
 - note that not every דיבור המתחיל is a new sub-topic always look at the context.
 - if there is no episodes (like it is an introduction AKA הסכמות) don't give anything usually הסכמות are in the start of the book.
+- sub headers must be in Hebrew, never translate anything to english or other languages
 
 ### IMPORTANT: JSON String Escaping Rules
 All string values MUST be valid JSON strings. This means:
