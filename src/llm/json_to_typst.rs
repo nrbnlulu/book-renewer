@@ -13,7 +13,19 @@ use std::{
 
 use super::orgenizer::Episode;
 
-const MAIN_TYP_BOILERPLATE: &str = r#"#set page(
+/// Shared helper functions exported to chapter files via `utils.typ`.
+const UTILS_TYP: &str = r#"#let q(body) = {
+  set text(weight: "bold", font: "Frank Ruhl Libre", size: 9.5pt)
+  body
+}
+"#;
+
+/// The import line prepended to every generated chapter file.
+const CHAPTER_IMPORT: &str = "#import \"../utils.typ\": q\n\n";
+
+const MAIN_TYP_BOILERPLATE: &str = r#"#import "utils.typ": q
+
+#set page(
   width: 4.25in, height: 6.87in,
   margin: (inside: 0.6in, outside: 0.4in, top: 0.6in, bottom: 0.4in),
   header: context {
@@ -30,7 +42,6 @@ const MAIN_TYP_BOILERPLATE: &str = r#"#set page(
 
 #set text(font: "David Libre", size: 9pt, lang: "he")
 #set par(justify: true, first-line-indent: 1.2em, leading: 0.55em)
-#let q(body) = { set text(weight: "bold", font: "Frank Ruhl Libre", size: 9.5pt); body }
 #show regex("\[.*?\]"): it => { set text(size: 0.75em, fill: gray.darken(50%)); it }
 #show heading.where(level: 1): it => {
   pagebreak(weak: true, to: "odd")
@@ -39,6 +50,16 @@ const MAIN_TYP_BOILERPLATE: &str = r#"#set page(
 #show heading.where(level: 2): it => {
   set align(right); set text(size: 10pt, weight: "bold"); block(above: 1.2em, below: 0.6em, it.body)
 }
+
+"#;
+
+/// Boilerplate used only for validation — inlines `q` so no file path resolution needed.
+const VALIDATION_BOILERPLATE: &str = r#"#let q(body) = {
+  set text(weight: "bold", font: "Frank Ruhl Libre", size: 9.5pt)
+  body
+}
+
+#set text(lang: "he")
 
 "#;
 
@@ -73,7 +94,7 @@ fn strip_typst_fences(response: &str) -> String {
 
 /// Returns `None` if valid, or `Some(error_text)` if compilation failed.
 fn validate_typst(chapter_content: &str) -> anyhow::Result<Option<String>> {
-    let full = format!("{MAIN_TYP_BOILERPLATE}\n{chapter_content}");
+    let full = format!("{VALIDATION_BOILERPLATE}\n{chapter_content}");
 
     let tmp_path = std::env::temp_dir().join("book_renewer_validate.typ");
     fs::write(&tmp_path, &full)?;
@@ -204,7 +225,7 @@ pub async fn convert_json_episodes_to_typst(book_name: &str) -> anyhow::Result<(
         let episode: Episode = serde_json::from_str(&json_content)?;
 
         let content = generate_validated_episode(&agent, &episode, *idx).await?;
-        fs::write(&typst_path, &content)?;
+        fs::write(&typst_path, format!("{CHAPTER_IMPORT}{content}"))?;
         log::info!("Converted episode {idx}: {}", episode.name);
         include_lines.push(format!("#include \"typst/{idx}.typ\""));
     }
@@ -214,6 +235,12 @@ pub async fn convert_json_episodes_to_typst(book_name: &str) -> anyhow::Result<(
 }
 
 fn write_main_typ(base_dir: &Path, include_lines: &[String]) -> anyhow::Result<()> {
+    let utils_path = base_dir.join("utils.typ");
+    if !utils_path.exists() {
+        fs::write(&utils_path, UTILS_TYP)?;
+        log::info!("Generated utils.typ");
+    }
+
     let main_typ_path = base_dir.join("main.typ");
     if main_typ_path.exists() {
         log::info!("main.typ already exists, skipping generation");
