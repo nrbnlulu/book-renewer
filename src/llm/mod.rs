@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rig::{client::ProviderClient, providers::gemini};
 
-mod json_to_typst;
+pub mod json_to_typst;
 pub mod orgenizer;
 
 

@@ -113,7 +113,7 @@ fn strip_fences(response: &str) -> anyhow::Result<String> {
         log::debug!("Stripped code fences successfully (inline)");
         Ok(result)
     } else {
-        log::warn!("Response does not contain ```json code fences");
+        log::warn!("Response does not contain ```json code fences, response: {response}");
         anyhow::bail!(
             "Response does not contain ```json code fences: {}",
             response
@@ -169,6 +169,9 @@ async fn get_actions_from_prompt(
     page_path: &Path,
 ) -> anyhow::Result<Vec<EpisodeAction>> {
     let response = agent.prompt(input_serialized).await?;
+    if let Ok(parsed) = serde_json::from_str::<Vec<EpisodeAction>>(&response) {
+        return Ok(parsed);
+    }
     let stripped = strip_fences(&response)?;
     let fixed = fix_json_escaping(&stripped);
     serde_json::from_str::<Vec<EpisodeAction>>(&fixed)
@@ -185,7 +188,7 @@ fn write_episode(output_dir: &Path, counter: usize, episode: &Episode) -> anyhow
 
 fn create_llm_agent(preamble: &str, client: &gemini::client::Client) -> Agent<CompletionModel> {
     client
-        .agent("gemini-2.5-flash")
+        .agent("gemini-3-flash-preview")
         .preamble(preamble)
         .temperature(0.5)
         .build()
@@ -220,6 +223,77 @@ fn raw_pages_files(input_dir: &str) -> anyhow::Result<Vec<PathBuf>> {
             .unwrap()
     });
     Ok(page_files)
+}
+
+/// Regenerate a single missing episode JSON from its raw page files.
+/// Reads all pages, feeds them sequentially to the organizer agent, and writes
+/// the accumulated episode to `output_dir/{index}.json`.
+pub async fn regenerate_episode_from_pages(
+    input_dir: &str,
+    book_name: &str,
+    episode_name: &str,
+    page_names: &[String],
+    index: usize,
+) -> anyhow::Result<()> {
+    log::info!("Regenerating episode {index} '{episode_name}' from {} pages", page_names.len());
+
+    let client = crate::llm::gemini_client();
+    let agent = create_toon_orgenizer_agent(&client);
+
+    let output_dir = Path::new(&format!("renewed-{book_name}")).join("jsoned");
+    let out_path = output_dir.join(format!("{index}.json"));
+
+    let mut episode = Episode {
+        name: episode_name.to_string(),
+        content: String::new(),
+        sub_headers: Vec::new(),
+    };
+
+    for page_name in page_names {
+        let page_path = Path::new(input_dir).join(page_name);
+        let new_raw_text = match fs::read_to_string(&page_path) {
+            Ok(t) => t,
+            Err(e) => {
+                log::warn!("Could not read {page_name}: {e}");
+                continue;
+            }
+        };
+
+        let input = JsonOrganizerInput {
+            current_episode: Some(episode.clone()),
+            new_raw_text,
+        };
+        let input_serialized = serde_json::to_string(&input)?;
+
+        let mut actions: anyhow::Result<Vec<EpisodeAction>> =
+            get_actions_from_prompt(&agent, &input_serialized, &page_path).await;
+        for _ in 0..5 {
+            if actions.is_ok() {
+                break;
+            }
+            actions = get_actions_from_prompt(&agent, &input_serialized, &page_path).await;
+        }
+
+        for action in actions? {
+            match action {
+                EpisodeAction::AppendLastEpisode { data, new_topics, .. } => {
+                    episode.content.push_str(&data);
+                    episode.sub_headers.extend(new_topics);
+                }
+                EpisodeAction::NewEpisode { name, data, new_topics } => {
+                    // Treat any new-episode split within these pages as a continuation
+                    log::warn!("Unexpected NewEpisode '{name}' while regenerating '{episode_name}' — merging as append");
+                    episode.content.push_str(&data);
+                    episode.sub_headers.extend(new_topics);
+                }
+            }
+        }
+    }
+
+    let json_content = serde_json::to_string_pretty(&episode)?;
+    fs::write(&out_path, json_content)?;
+    log::info!("Wrote regenerated episode to {:?}", out_path);
+    Ok(())
 }
 
 pub async fn group_raw_text_to_episodes(input_dir: &str, book_name: &str) -> anyhow::Result<()> {

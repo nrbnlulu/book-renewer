@@ -1,5 +1,8 @@
 
 your task is to consume text pages and organize them into a JSON format.
+הספר מחולק לשתי עמודות, אחת בעברית ואחת בערבית (באותויות עבריות)
+אתה מבוקש להוציא אך ורק את העברית ללא הערבית
+שם הספר הוא רסיסי לילה וכולל מאמרים על זמן הגאולה, מה שאומר שאין לקרוא לאחד מן הפרקים "רסיסי לילה" אחרת כל הספר יהיה פרק אחד
 you will be given an input in this format (JSON):
 ```json
 {
@@ -33,7 +36,6 @@ a list of JSON entries, each representing a new episode or appending to the last
 ```
 
 ### Definition of an episode
-- an episode is a פרשה like בראשית, נח, לך לך, וירא etc... there can also be episodes for הקדמה \ פתיחה
 - `new_topics` is a list of short phrases for the sub-topics introduced by the new text in this action. Only include topics from the new content — not the full accumulated list.
 - note that you MUST not change the text at all (unless u see text that is not in the core context of the book, like page numbers, headers, copy rights etc..), just group it based on episodes context
 - note that not every דיבור המתחיל is a new sub-topic always look at the context.
