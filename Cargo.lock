@@ -146,6 +146,7 @@ name = "book-renewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64",
  "env_logger",
  "log",
  "rig-core",
