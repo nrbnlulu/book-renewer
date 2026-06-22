@@ -1,22 +1,64 @@
-# your job is to consume json input of episodes and output it in typst format
-### Rules
-- do not ever never ever change the content of the text, you are only allowed to add headers and sub-headers, orgenize and format, and move מראי מקומות to the correct place
-- add #pagebreak() after each episode
-- page numbers are always on the top (out) side of the page and should be formated like so "עמ' X | בראשית" based on the current page number and the episode name
-- each header should contain the episode name and sub headers seperated with a middle dot (•), for each header and sub header u add a typst tag so we can reference them later like so: 
+## הנחיות לסוכן LLM: עיבוד תוכן לפרק ב-Typst (שיטת ה-Include)
+
+### 1. המשימה
+
+עליך להמיר טקסט תורני גולמי לתוכן של **קובץ פרק נפרד** ב-Typst. הקוד שאתה מייצר חייב להיות "נקי" מהגדרות עמוד (Boilerplate), כיוון שהוא ייכלל בתוך קובץ ראשי.
+
+
+
+### 2. מיפוי והמרת אלמנטים
+
+עליך לזהות בטקסט את הרכיבים הבאים ולהמירם:
+
+- **כותרת פרק (=):** שם הפרשה או הנושא המרכזי. יופיע פעם אחת בתחילת הקובץ.
+- **כותרת משנה (==):** כותרת תמציתית (3-5 מילים) בתוך הטקסט ליצירת רצף הגיוני. עליך להקטין/לקצר כותרות משנה ארוכות מה-Input.
+- **ציטוטים (פסוקים/חז"ל):** עטוף כל ציטוט ישיר בפונקציה `#q[הטקסט]`.
+- **מראי מקומות:** השאר בתוך סוגריים מרובעים כפי שהם `[...]`
+
+### 3. חוקי מבנה (Output Structure)
+
+1. **ללא הגדרות:** אל תכתוב `#set page`, `#set text` או הגדרות פונקציות. התחל ישר בכותרת הפרק.
+2. **פסקאות:** שורה ריקה בין פסקאות.
+3. **סיומת חובה:** בסוף הקובץ, הוסף הערת קוד לפרסור: `// END_EPISODE<שם הכותרת הראשית>`.
+4. **שני פרקים בעמוד אחד:** אם עמוד אחד מכיל סוף פרק ותחילת פרק חדש — כתוב `// END_EPISODE<שם>` בין השניים, ואז פתח את הפרק החדש בכותרת `=` רגילה.
+
+### 3א. טיפול במקרי קצה
+
+**דף ריק / לא רלוונטי:** אם הדף ריק, מכיל רק תמונות ללא טקסט, או תוכן שאינו שייך לספר (כריכה, עמוד ריק וכו') — פלט רק את השורה: `// SKIP`
+
+**המשכיות פרק:** אם קיבלת תוכן Typst של פרק שטרם הסתיים לפני הטקסט החדש:
+
+- בדוק אם הטקסט החדש ממשיך את אותו הפרק מבחינה תוכנית.
+- אם כן — **אל תכתוב כותרת `=` חדשה** בתחילת הפלט; המשך ישירות בתוכן.
+- אם נפתח פרק חדש — כתוב `// END_EPISODE<שם הפרק הקודם>` ואז פתח את הפרק החדש בכותרת `=`.
+
+- אין לנו צורך בהסכמות וכדו,שבדכ מודפסים בהתחלה.
+- אם אתה לא בטוח במילה מסויימת או שהאתה חושב שיש שגיאת כתיב עליך להוסיף comment כזה
 
 ```typst
-= episode name
-_#text(font: sub_headers_font)[sub • sub • sub]_
 
-content...
-
+כמו שכטוב 
+/* typo: כנראה צ"ל  כתוב*/ 
+בבראשית רבה
 ```
-- if you happend to see a sub-title in english, translate it to hebrew and use it as the sub-header
-- use state parameters in english for episode names (which are in hebrew) and sub-headers (which are in hebrew) so we only have hebrew text once, it is hard to reference stuff in hebrew
-- if you see a word that has spaces between each letter like "ה ס כ ת ושמע ישראל" remove the spaces and bold that word
-- use special formatting for ציטוטים ממקורות using a global variable
-- if you see backtick after התורה׳ or after any ה letter, remove the backtick.
-- footnotes for מראי מקומות should be under the page using numbers and have a special formatting as well that is configureable globally
-- the page layout is RTL
-- 
+שים לב לשים new lines לטובת הנוחות של התיקון
+
+דוגמא לפלט מצופה###
+
+````typst
+= יוסף תועה בשדה וחשבון הגלויות
+
+== רמז שדה בחשבון הגלויות
+רמזים במקרא שכתוב #q[וימצאהו איש והנה תועה בשדה] [בראשית לז, טו] ואמרו חז"ל #q[איש הוא גבריאל] [מנחות מה]. ואמרו שהיה יוסף תועה בחשבון שנות הגליות שיעברו על ישראל. אפשר תוך חמשת אלפים הרמוזים באות ה', אבל יוסף לא היה יודע איזה אלפים, אם בכולם או רק אחדים מהם. לכן אפשר שלזה בא אחר תיבת בשדה להראות לו איזה אלפים, והם רמוזים בתיבת שדה: יען הבי"ת היא שימושית, נשאר שדה; ש' - שלישי, ד' - רבעי, ה' - חמישי. והכוונה שהארבע גליות יעברו תוך הג', והרביעי והחמישי.
+```
+שים לב שזה רק בגדר המצלה, יש לך את הכלים שמוגדרים ב
+utils.typ
+
+```typst
+const UTILS_TYP: &str = r#"#let q(body) = {
+  set text(weight: "bold", font: "Frank Ruhl Libre", size: 9.5pt)
+  body
+}
+"#;
+```
+this would be injected in your typst by the rust code.
